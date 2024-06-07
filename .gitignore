@@ -1,0 +1,13 @@
+# Игнорирование node_modules
+node_modules/
+# Игнорирование json файлов
+json/
+# Игнорирование тестовых скриптов
+js/Test/
+# Игнорирование ssl
+.ssl/
+# Игнорирование ключей
+.key/
+# Игнорирование package
+package-lock.json
+package.json
