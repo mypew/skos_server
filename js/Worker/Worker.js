@@ -1,5 +1,5 @@
 //-----------Подключаемые модули-----------//
-const HundlerRequest = require('./HundlerRequest');
+const HundlerRequest = require('./../Server/HundlerRequest');
 //-----------Подключаемые модули-----------//
 
 /**

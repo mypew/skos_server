@@ -4,8 +4,8 @@ const fs = require('fs');
 const https = require('https');
 const Get = require('./Get');
 const Post = require('./Post');
-const WorkerController = require('./WorkerController');
-const Notification = require('./../Data/Notification');
+const WorkerController = require('./../Worker/WorkerController');
+const Notifications = require('./../Data/Notifications');
 //-----------Подключаемые модули-----------//
 
 /**
@@ -111,7 +111,7 @@ class Server {
    * Функция, которая запускает таймеры, циклически срабатывающих
    */
   Timers() {
-    Notification.RecostingNotifications();
+    Notifications.RecostingNotifications();
     //-------------------------------------------------------//
 
     console.log(`Запущены все таймеры.`);

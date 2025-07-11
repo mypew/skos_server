@@ -1,5 +1,5 @@
 //-----------Подключаемые модули-----------//
-const WorkerController = require('./WorkerController');
+const WorkerController = require('./../Worker/WorkerController');
 //-----------Подключаемые модули-----------//
 
 /**

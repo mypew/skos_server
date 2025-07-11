@@ -1,6 +1,9 @@
 //-----------Подключаемые модули-----------//
-const Mysql = require('./Mysql');
-const ValidationData = require('./../SubModules/ValidationData');
+const Mysql = require('./../DataBase/Mysql');
+const Roles = require('./Roles');
+const Authorization = require('./../Server/Authorization');
+const ValidationData = require('./../Server/ValidationData');
+const MyDate = require('./../Modules/MyDate');
 //-----------Подключаемые модули-----------//
 
 /**
@@ -14,54 +17,134 @@ class Table {
   static async Post(message) {
     if(!(await ValidationData.TablePost(message))) return {error: "Bad request"};
 
+    let token = await Authorization.TokenInfo(message);
+    if(!token.token_verify) return {error: "Bad token"};
+
+    if(!(await Roles.PermissionsPlanSchedule(message, token.token_info.role))) return {error: "Permission denied"};
+    if(!(await Roles.PermissionsStatement(message, token.token_info.role))) return {error: "Permission denied"};
+
     let data;
 
-    if(message.body.request_type == "VIEW") {
+    if(message.body.type_request == "VIEW") {
       data = await Table.RequestTrainingList(message,"*","id,id_PG","id,id_direction,count_people,date_start_training,date_start_industrial_training,date_end_industrial_training,date_exam");
 
       //Подгонка данных под стандарты таблицы на сайте
       data = await Table.CustomizeData(data, message);
       //Подгонка данных под стандарты таблицы на сайте
     }
-    else if(message.body.request_type == "VIEW_STATEMENT") {
+    else if(message.body.type_request == "VIEW_STATEMENT") {
       data = await Table.RequestTrainingList(message,"id,id_profession,id_division,id_section","id,id_PG","id,id_direction,count_people,count_people_fact,count_people_trained");
     }
-    else if(message.body.request_type == "SAVE") {
+    else if(message.body.type_request == "SAVE") {
       for(let i = 0; i < message.body.training_list.length; i++) {
         if(message.body.training_list[i].status == 0) {
-          await Mysql.Request(`skos`, `DELETE FROM TrainingList WHERE id=${message.body.training_list[i].id};`);
+          await Mysql.ParameterChange(`skos`, `TrainingList`, message.body.training_list[i].status, [
+            {name: 'id', data: message.body.training_list[i].id, type: 'INT'}
+          ]);
         } else if(message.body.training_list[i].status == 1) {
-          await Mysql.Request(`skos`, `UPDATE TrainingList SET id_division=${message.body.training_list[i].id_division},id_section=${message.body.training_list[i].id_section},id_profession=${message.body.training_list[i].id_profession},table_type=${message.body.training_list[i].table_type},academic_year=${message.body.training_list[i].academic_year},to1=${message.body.training_list[i].to1},per=${message.body.training_list[i].per},indt=${message.body.training_list[i].indt},tren=${message.body.training_list[i].tren},exam=${message.body.training_list[i].exam},to2=${message.body.training_list[i].to2},po=${message.body.training_list[i].po} WHERE id=${message.body.training_list[i].id};`);
+          await Mysql.ParameterChange(`skos`, `TrainingList`, message.body.training_list[i].status, [
+            {name: 'id', data: message.body.training_list[i].id, type: 'INT'},
+            {name: 'id_division', data: message.body.training_list[i].id_division, type: 'INT'},
+            {name: 'id_section', data: message.body.training_list[i].id_section, type: 'INT'},
+            {name: 'id_profession', data: message.body.training_list[i].id_profession, type: 'INT'},
+            {name: 'table_type', data: message.body.training_list[i].table_type, type: 'INT'},
+            {name: 'academic_year', data: message.body.training_list[i].academic_year, type: 'INT'},
+            {name: 'to1', data: message.body.training_list[i].to1, type: 'FLOAT'},
+            {name: 'per', data: message.body.training_list[i].per, type: 'FLOAT'},
+            {name: 'indt', data: message.body.training_list[i].indt, type: 'FLOAT'},
+            {name: 'tren', data: message.body.training_list[i].tren, type: 'FLOAT'},
+            {name: 'exam', data: message.body.training_list[i].exam, type: 'FLOAT'},
+            {name: 'to2', data: message.body.training_list[i].to2, type: 'FLOAT'},
+            {name: 'po', data: message.body.training_list[i].po, type: 'FLOAT'}
+          ]);
           for(let j = 0; j < message.body.training_list[i].profession_groups.length; j++) {
-            if(message.body.training_list[i].profession_groups[j].status == 0)
-              await Mysql.Request(`skos`, `DELETE FROM ProfessionGroupList WHERE id=${message.body.training_list[i].profession_groups[j].id};`);
-            else if(message.body.training_list[i].profession_groups[j].status == 1)
-              await Mysql.Request(`skos`, `UPDATE ProfessionGroupList SET id_PG=${message.body.training_list[i].profession_groups[j].id_PG},id_training=${message.body.training_list[i].id} WHERE id=${message.body.training_list[i].profession_groups[j].id};`);
-            else if(message.body.training_list[i].profession_groups[j].status == 2)
-              await Mysql.Request(`skos`, `INSERT INTO ProfessionGroupList(id_PG,id_training) VALUES(${message.body.training_list[i].profession_groups[j].id_PG},${message.body.training_list[i].id});`);
+            if(message.body.training_list[i].profession_groups[j].status == 0) {
+              await Mysql.ParameterChange(`skos`, `ProfessionGroupList`, message.body.training_list[i].profession_groups[j].status, [
+                {name: 'id', data: message.body.training_list[i].profession_groups[j].id, type: 'INT'}
+              ]);
+            }
+            else if(message.body.training_list[i].profession_groups[j].status == 1) {
+              await Mysql.ParameterChange(`skos`, `ProfessionGroupList`, message.body.training_list[i].profession_groups[j].status, [
+                {name: 'id', data: message.body.training_list[i].profession_groups[j].id, type: 'INT'},
+                {name: 'id_PG', data: message.body.training_list[i].profession_groups[j].id_PG, type: 'INT'},
+                {name: 'id_training', data: message.body.training_list[i].id, type: 'INT'}
+              ]);
+            }
+            else if(message.body.training_list[i].profession_groups[j].status == 2) {
+              await Mysql.ParameterChange(`skos`, `ProfessionGroupList`, message.body.training_list[i].profession_groups[j].status, [
+                {name: 'id_PG', data: message.body.training_list[i].profession_groups[j].id_PG, type: 'INT'},
+                {name: 'id_training', data: message.body.training_list[i].id, type: 'INT'}
+              ]);
+            }
           }
           for(let j = 0; j < message.body.training_list[i].directions.length; j++) {
-            if(message.body.training_list[i].directions[j].status == 0)
-              await Mysql.Request(`skos`, `DELETE FROM DirectionList WHERE id=${message.body.training_list[i].directions[j].id};`);
-            else if(message.body.training_list[i].directions[j].status == 1)
-              await Mysql.Request(`skos`, `UPDATE DirectionList SET id_direction=${message.body.training_list[i].directions[j].id_direction},id_training=${message.body.training_list[i].id},count_people=${message.body.training_list[i].directions[j].count_people},date_start_training=${message.body.training_list[i].directions[j].date_start_training},date_start_industrial_training=${message.body.training_list[i].directions[j].date_start_industrial_training},date_end_industrial_training=${message.body.training_list[i].directions[j].date_end_industrial_training},date_exam=${message.body.training_list[i].directions[j].date_exam} WHERE id=${message.body.training_list[i].directions[j].id};`);
-            else if(message.body.training_list[i].directions[j].status == 2)
-              await Mysql.Request(`skos`, `INSERT INTO DirectionList(id_direction,id_training,count_people,date_start_training,date_start_industrial_training,date_end_industrial_training,date_exam) VALUES(${message.body.training_list[i].directions[j].id_direction},${message.body.training_list[i].id},${message.body.training_list[i].directions[j].count_people},${message.body.training_list[i].directions[j].date_start_training},${message.body.training_list[i].directions[j].date_start_industrial_training},${message.body.training_list[i].directions[j].date_end_industrial_training},${message.body.training_list[i].directions[j].date_exam});`);
+            if(message.body.training_list[i].directions[j].status == 0) {
+              await Mysql.ParameterChange(`skos`, `DirectionList`, message.body.training_list[i].directions[j].status, [
+                {name: 'id', data: message.body.training_list[i].directions[j].id, type: 'INT'}
+              ]);
+            }
+            else if(message.body.training_list[i].directions[j].status == 1) {
+              await Mysql.ParameterChange(`skos`, `DirectionList`, message.body.training_list[i].directions[j].status, [
+                {name: 'id', data: message.body.training_list[i].directions[j].id, type: 'INT'},
+                {name: 'id_direction', data: message.body.training_list[i].directions[j].id_direction, type: 'INT'},
+                {name: 'id_training', data: message.body.training_list[i].id, type: 'INT'},
+                {name: 'count_people', data: message.body.training_list[i].directions[j].count_people, type: 'INT'},
+                {name: 'date_start_training', data: message.body.training_list[i].directions[j].date_start_training, type: 'STRING'},
+                {name: 'date_start_industrial_training', data: message.body.training_list[i].directions[j].date_start_industrial_training, type: 'STRING'},
+                {name: 'date_end_industrial_training', data: message.body.training_list[i].directions[j].date_end_industrial_training, type: 'STRING'},
+                {name: 'date_exam', data: message.body.training_list[i].directions[j].date_exam, type: 'STRING'},
+              ]);
+            }
+            else if(message.body.training_list[i].directions[j].status == 2) {
+              await Mysql.ParameterChange(`skos`, `DirectionList`, message.body.training_list[i].directions[j].status, [
+                {name: 'id_direction', data: message.body.training_list[i].directions[j].id_direction, type: 'INT'},
+                {name: 'id_training', data: message.body.training_list[i].id, type: 'INT'},
+                {name: 'count_people', data: message.body.training_list[i].directions[j].count_people, type: 'INT'},
+                {name: 'date_start_training', data: message.body.training_list[i].directions[j].date_start_training, type: 'STRING'},
+                {name: 'date_start_industrial_training', data: message.body.training_list[i].directions[j].date_start_industrial_training, type: 'STRING'},
+                {name: 'date_end_industrial_training', data: message.body.training_list[i].directions[j].date_end_industrial_training, type: 'STRING'},
+                {name: 'date_exam', data: message.body.training_list[i].directions[j].date_exam, type: 'STRING'},
+              ]);
+            }
           }
         } else if(message.body.training_list[i].status == 2) {
-          let output = await Mysql.Request(`skos`, `INSERT INTO TrainingList(id_division,id_section,id_profession,table_type,academic_year,to1,per,indt,tren,exam,to2,po) VALUES(${message.body.training_list[i].id_division},${message.body.training_list[i].id_section},${message.body.training_list[i].id_profession},${message.body.training_list[i].table_type},${message.body.training_list[i].academic_year},${message.body.training_list[i].to1},${message.body.training_list[i].per},${message.body.training_list[i].indt},${message.body.training_list[i].tren},${message.body.training_list[i].exam},${message.body.training_list[i].to2},${message.body.training_list[i].po});`);
+          let output = await Mysql.ParameterChange(`skos`, `TrainingList`, message.body.training_list[i].status, [
+            {name: 'id_division', data: message.body.training_list[i].id_division, type: 'INT'},
+            {name: 'id_section', data: message.body.training_list[i].id_section, type: 'INT'},
+            {name: 'id_profession', data: message.body.training_list[i].id_profession, type: 'INT'},
+            {name: 'table_type', data: message.body.training_list[i].table_type, type: 'INT'},
+            {name: 'academic_year', data: message.body.training_list[i].academic_year, type: 'INT'},
+            {name: 'to1', data: message.body.training_list[i].to1, type: 'FLOAT'},
+            {name: 'per', data: message.body.training_list[i].per, type: 'FLOAT'},
+            {name: 'indt', data: message.body.training_list[i].indt, type: 'FLOAT'},
+            {name: 'tren', data: message.body.training_list[i].tren, type: 'FLOAT'},
+            {name: 'exam', data: message.body.training_list[i].exam, type: 'FLOAT'},
+            {name: 'to2', data: message.body.training_list[i].to2, type: 'FLOAT'},
+            {name: 'po', data: message.body.training_list[i].po, type: 'FLOAT'}
+          ]);
           for(let j = 0; j < message.body.training_list[i].profession_groups.length; j++) {
-            await Mysql.Request(`skos`, `INSERT INTO ProfessionGroupList(id_PG,id_training) VALUES(${message.body.training_list[i].profession_groups[j].id_PG},${output.insertId});`);
+            await Mysql.ParameterChange(`skos`, `ProfessionGroupList`, 2, [
+              {name: 'id_PG', data: message.body.training_list[i].profession_groups[j].id_PG, type: 'INT'},
+              {name: 'id_training', data: output.insertId, type: 'INT'}
+            ]);
           }
           for(let j = 0; j < message.body.training_list[i].directions.length; j++) {
-            await Mysql.Request(`skos`, `INSERT INTO DirectionList(id_direction,id_training,count_people,date_start_training,date_start_industrial_training,date_end_industrial_training,date_exam) VALUES(${message.body.training_list[i].directions[j].id_direction},${output.insertId},${message.body.training_list[i].directions[j].count_people},${message.body.training_list[i].directions[j].date_start_training},${message.body.training_list[i].directions[j].date_start_industrial_training},${message.body.training_list[i].directions[j].date_end_industrial_training},${message.body.training_list[i].directions[j].date_exam});`);
+            await Mysql.ParameterChange(`skos`, `DirectionList`, 2, [
+              {name: 'id_direction', data: message.body.training_list[i].directions[j].id_direction, type: 'INT'},
+              {name: 'id_training', data: output.insertId, type: 'INT'},
+              {name: 'count_people', data: message.body.training_list[i].directions[j].count_people, type: 'INT'},
+              {name: 'date_start_training', data: message.body.training_list[i].directions[j].date_start_training, type: 'STRING'},
+              {name: 'date_start_industrial_training', data: message.body.training_list[i].directions[j].date_start_industrial_training, type: 'STRING'},
+              {name: 'date_end_industrial_training', data: message.body.training_list[i].directions[j].date_end_industrial_training, type: 'STRING'},
+              {name: 'date_exam', data: message.body.training_list[i].directions[j].date_exam, type: 'STRING'},
+            ]);
           }
         }
       }
       
       data = "OK";
     }
-    else if(message.body.request_type == "SAVE_STATEMENT") {
+    else if(message.body.type_request == "SAVE_STATEMENT") {
       for(let i = 0; i < message.body.training_list.length; i++) {
         if(message.body.training_list[i].status == 1) {
           for(let j = 0; j < message.body.training_list[i].directions.length; j++) {
@@ -83,6 +166,8 @@ class Table {
     */
   static async RequestTrainingList(message,training_list_params,profession_groups_params,direction_list_params) {
     let request = `SELECT ${training_list_params} FROM TrainingList`;
+    let from_date = (typeof message.body.from_date != "undefined") ? await MyDate.DateMysqlTimeStamp(message.body.from_date) : `1970-01-01`;
+    let to_date = (typeof message.body.to_date != "undefined") ? await MyDate.DateMysqlTimeStamp(message.body.to_date) : `2100-01-01`;
 
     //Выборка по where на sql запрос
     let where = [];
@@ -111,26 +196,29 @@ class Table {
       }
 
       if(direction_list_params != null) {
-        if(typeof message.body.id_direction != "undefined")
-          data[i].directions = await Mysql.Request(`skos`, `SELECT ${direction_list_params} FROM DirectionList WHERE id_training=${data[i].id} AND id_direction=${message.body.id_direction};`);
-        else data[i].directions = await Mysql.Request(`skos`, `SELECT ${direction_list_params} FROM DirectionList WHERE id_training=${data[i].id};`);
+        if(typeof message.body.id_direction != "undefined") {
+          let sql_request = `SELECT ${direction_list_params} FROM DirectionList WHERE id_training=${data[i].id} AND id_direction=${message.body.id_direction} AND date_start_training BETWEEN '${from_date}' AND '${to_date}'`;
+          if(message.type_request == 'VIEW') sql_request += ` OR id_training=${data[i].id} AND id_direction=${message.body.id_direction} AND date_start_training IS NULL`;
+          data[i].directions = await Mysql.Request(`skos`, sql_request);
+        }
+        else {
+          let sql_request = `SELECT ${direction_list_params} FROM DirectionList WHERE id_training=${data[i].id} AND date_start_training BETWEEN '${from_date}' AND '${to_date}'`;
+          if(message.type_request == 'VIEW') sql_request += ` OR id_training=${data[i].id} AND date_start_training IS NULL`;
+          data[i].directions = await Mysql.Request(`skos`, sql_request);
+        }
 
         for(let j = 0; j < data[i].directions.length; j++) { 
           if(typeof data[i].directions[j].date_start_training != "undefined") {
-            let date_ = new Date(data[i].directions[j].date_start_training);
-            data[i].directions[j].date_start_training = `${date_.getFullYear()}-${String(date_.getMonth()+1).padStart(2,'0')}-${String(date_.getDate()).padStart(2,'0')}`;
+            data[i].directions[j].date_start_training = await MyDate.TableDate(data[i].directions[j].date_start_training);
           }
           if(typeof data[i].directions[j].date_start_industrial_training != "undefined") {
-            let date_ = new Date(data[i].directions[j].date_start_industrial_training);
-            data[i].directions[j].date_start_industrial_training = `${date_.getFullYear()}-${String(date_.getMonth()+1).padStart(2,'0')}-${String(date_.getDate()).padStart(2,'0')}`;
+            data[i].directions[j].date_start_industrial_training = await MyDate.TableDate(data[i].directions[j].date_start_industrial_training);
           }
           if(typeof data[i].directions[j].date_end_industrial_training != "undefined") {
-            let date_ = new Date(data[i].directions[j].date_end_industrial_training);
-            data[i].directions[j].date_end_industrial_training = `${date_.getFullYear()}-${String(date_.getMonth()+1).padStart(2,'0')}-${String(date_.getDate()).padStart(2,'0')}`;
+            data[i].directions[j].date_end_industrial_training = await MyDate.TableDate(data[i].directions[j].date_end_industrial_training);
           }
           if(typeof data[i].directions[j].date_exam != "undefined") {
-            let date_ = new Date(data[i].directions[j].date_exam);
-            data[i].directions[j].date_exam = `${date_.getFullYear()}-${String(date_.getMonth()+1).padStart(2,'0')}-${String(date_.getDate()).padStart(2,'0')}`;
+            data[i].directions[j].date_exam = await MyDate.TableDate(data[i].directions[j].date_exam);
           }
         }
       }
@@ -224,7 +312,7 @@ class Table {
                 result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].start_po.push(data[i].directions[t].date_start_industrial_training);
                 result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].end_po.push(data[i].directions[t].date_end_industrial_training);
                 result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].qual_ex.push(data[i].directions[t].date_exam);
-                result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].direction.push(data[i].directions[t].id_direction);
+                result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].direction.push({id: data[i].directions[t].id, id_direction: data[i].directions[t].id_direction});
                 result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].count.push(data[i].directions[t].count_people);
                 result.arr_plan[j].arr_chapter[k].arr_profession[result.arr_plan[j].arr_chapter[k].arr_profession.length-1].count_people += data[i].directions[t].count_people;
                 if(typeof result.arr_plan[j].arr_chapter[k].arr_profession_results['directions'][data[i].directions[t].id_direction] != "undefined")
@@ -304,7 +392,7 @@ class Table {
               result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].start_po.push(data[i].directions[t].date_start_industrial_training);
               result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].end_po.push(data[i].directions[t].date_end_industrial_training);
               result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].qual_ex.push(data[i].directions[t].date_exam);
-              result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].direction.push(data[i].directions[t].id_direction);
+              result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].direction.push({id: data[i].directions[t].id, id_direction: data[i].directions[t].id_direction});
               result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].count.push(data[i].directions[t].count_people);
               result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession[0].count_people += data[i].directions[t].count_people;
               if(typeof result.arr_plan[j].arr_chapter[result.arr_plan[j].arr_chapter.length-1].arr_profession_results['directions'][data[i].directions[t].id_direction] != "undefined")
@@ -399,7 +487,7 @@ class Table {
           result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].start_po.push(data[i].directions[t].date_start_industrial_training);
           result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].end_po.push(data[i].directions[t].date_end_industrial_training);
           result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].qual_ex.push(data[i].directions[t].date_exam);
-          result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].direction.push(data[i].directions[t].id_direction);
+          result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].direction.push({id: data[i].directions[t].id, id_direction: data[i].directions[t].id_direction});
           result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].count.push(data[i].directions[t].count_people);
           result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession[0].count_people += data[i].directions[t].count_people;
           if(typeof result.arr_plan[result.arr_plan.length-1].arr_chapter[0].arr_profession_results['directions'][data[i].directions[t].id_direction] != "undefined")

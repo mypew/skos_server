@@ -1,7 +1,7 @@
 //-----------Подключаемые модули-----------//
 const bcrypt = require('bcrypt');
-const Mysql = require('./../Data/Mysql');
-const ValidationData = require('./../SubModules/ValidationData');
+const Mysql = require('./../DataBase/Mysql');
+const ValidationData = require('./ValidationData');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 //-----------Подключаемые модули-----------//
@@ -26,7 +26,7 @@ class Authorization {
       let payload = {login: user.login, role: user.role};
       let secret_key = fs.readFileSync(__dirname + '/../../.key/jwt_secret.key').toString();
 
-      return {jwt: jwt.sign(payload, secret_key, {expiresIn: "720h"})};
+      return {jwt: jwt.sign(payload, secret_key, {expiresIn: "24h"})};
     }
     else {
       return {error: "User not found"};

@@ -103,7 +103,7 @@ class WorkerController {
    */
   static CreateWorkers(workers_count, workers_memory_size) {
     for(let i = 0; i < workers_count; i++) {
-      WorkerController.workers.push(fork(__dirname + '/../Worker/Worker', { execArgv: [`--max-old-space-size=${workers_memory_size}`]} ));
+      WorkerController.workers.push(fork(__dirname + '/Worker', { execArgv: [`--max-old-space-size=${workers_memory_size}`]} ));
       WorkerController.workers[i].status = "free";
     }
   }

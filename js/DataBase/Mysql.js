@@ -58,6 +58,60 @@ class Mysql {
         });
         return connection;
     }
+
+    static async ParameterChange(database, table, type, params) {
+        let sql = ``;
+
+        if(params.length == 0) return false;
+
+        for(let i = 0; i < params.length; i++) {
+            if(params[i].type == 'STRING' && params[i].data == '') {
+                params[i].data = null;
+            }
+            else if(params[i].type == 'STRING' && params[i].data != null) {
+                params[i].data = `'${params[i].data}'`;
+            }
+        }
+
+        if(type == 0) {
+            sql = `DELETE FROM ${table} WHERE ${params[0].name}=${params[0].data}`;
+        } else if(type == 1) {
+            sql = `UPDATE ${table} SET`;
+            sql += ` ${params[1].name}=${params[1].data}`;
+            for(let i = 2; i < params.length; i++) {
+                sql += `, ${params[i].name}=${params[i].data}`;
+            }
+            sql += ` WHERE ${params[0].name}=${params[0].data}`;
+        } else if(type == 2) {
+            sql = `INSERT INTO ${table}(`;
+            if(params[0].type == 'INT' && params[0].data == -1) {
+                sql += `${params[1].name}`;
+                for(let i = 2; i < params.length; i++) {
+                    sql += `,${params[i].name}`;
+                }
+                sql += `) VALUES(`;
+                sql += `${params[1].data}`;
+                for(let i = 2; i < params.length; i++) {
+                    sql += `,${params[i].data}`;
+                }
+                sql += `)`;
+            } else {
+                sql += `${params[0].name}`;
+                for(let i = 1; i < params.length; i++) {
+                    sql += `,${params[i].name}`;
+                }
+                sql += `) VALUES(`;
+                sql += `${params[0].data}`;
+                for(let i = 1; i < params.length; i++) {
+                    sql += `,${params[i].data}`;
+                }
+                sql += `)`;
+            }
+        } else return false;
+        console.log(sql);
+
+        return Mysql.Request(database, sql + ';');
+    }
 }
 
 //-----------Экспортируемые модули-----------//
